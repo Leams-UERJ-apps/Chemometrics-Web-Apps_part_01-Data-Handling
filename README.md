@@ -46,7 +46,7 @@ It is necessary to have the R and RStudio previously installed in your computer.
   > - Save with encoding
   > - UTF-8
 
-## Data Handling: Chemometrics R-Web App 1 ![image](https://img.shields.io/badge/Version-DH--1.1-blueviolet)
+## Data Handling: Chemometrics R-Web App 1 ![image](https://img.shields.io/badge/Version-DH--1.2-blueviolet)
 - This app is currently available for online usage in [this link](https://licarionpinto.shinyapps.io/Data_Handling_app/)
 - Features:
   - Descriptive analysis:
@@ -55,7 +55,7 @@ It is necessary to have the R and RStudio previously installed in your computer.
     - Multivariate normality testing
     - Interactive Plots
     - Missing data analysis
-    - Correlation Heatmap
+    - Correlation Heatmap (NEW modes adeed)
 
   - Data Imputation:
     - Simple substituitions (mean, median and 0's)
@@ -74,6 +74,7 @@ It is necessary to have the R and RStudio previously installed in your computer.
 
   - Spectral Visualization
     - Custom spectral image 2D generation (view by class, classes means, select axis names and image definition...)
+    - Spectral Interactive Plot (NEW)
 
   - Variables Preprocessing
     - Simple Operations (mean centering, scaling, autoscaling, logarithmic transformation and frobenius normalization)
