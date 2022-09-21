@@ -14,9 +14,10 @@
 #
 #
 #
-#------------------------------------------------------------------------------VERSION 1.1-----------------------------------------------------------------------------------------------------#
+#------------------------------------------------------------------------------VERSION DH-1.2-----------------------------------------------------------------------------------------------------#
 
 #CHANGE LOG 
+
 # Version 1.0
 # - Launch
 
@@ -24,16 +25,24 @@
 # - New and improved correlation map
 # - Boxplot and histogram boxes now have matching sizes and their plots align for better printing capability
 # - Settings and Normality tests boxes now have the same sizes
-# - Introduction of an internal DEMO (ceramic dataset - 
-#                                         He, Z., Zhang, M., & Zhang, H. (2016). Data-driven research on chemical features of Jingdezhen and Longquan celadon by energy dispersive X-ray fluorescence. Ceramics International, 42(4), 5123-5129.)
-#                                         https://archive.ics.uci.edu/ml/datasets/Chemical+Composition+of+Ceramic+Samples
+# - Introduction of an internal DEMO (Ceramic dataset - He, Z., Zhang, M., & Zhang, H. (2016). Data-driven research on chemical features of Jingdezhen and Longquan celadon by energy dispersive X-ray fluorescence. Ceramics International, 42(4), 5123-5129.)
+#                                                       https://archive.ics.uci.edu/ml/datasets/Chemical+Composition+of+Ceramic+Samples
 #                                      
 #                                     Uv/Vis Coffee - authors
 #                                     Iris dataset
 #                                     )
 #
 # - Automatic importation parameters for dataset demos 
-#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+# - Corrected minor english errors
+# - Corrected sample class visualization when removing samples from the original dataset
+
+
+# Version 1.2
+# - Corrected Moving average and simple derivative processing
+# - Added new ways to visualize the correlation in the data
+# - Added de interactive spectral plot feature
+# - Added new spectral pretreatment layout
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
 
 library(IDPmisc)
 library(shiny)
@@ -66,6 +75,7 @@ library(ptw)
 library(MVN)
 library(mvnormtest)
 library(corrplot)
+library(GGally)
 
 options(shiny.maxRequestSize=1000*1024^2)
 library(BiocManager)
@@ -122,6 +132,10 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                            href = 'http://www.iq.uerj.br/', 
                                            icon = icon("link", lib = "glyphicon")
                                ),
+                               menuSubItem(text = "Our GitHub",
+                                           href = 'https://github.com/Leams-UERJ-apps/Chemometrics-Web-Apps', 
+                                           icon = icon("link", lib = "glyphicon")
+                               ),
                                menuSubItem(tabName = "creditstab", 
                                            text = "Credits", 
                                            icon = icon("user", lib = "glyphicon")
@@ -150,6 +164,7 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                       checkboxInput("isspectra",strong("Check if the data is of spectral type.")),
                                       shiny::hr(),
                                       checkboxInput("classcol", strong(" Check if the first/second column presents sample classes."), F),
+                                      conditionalPanel(condition = "input.classcol == true", numericInput("classpos", "Select the class column position: (for .RData files and DEMOS, please ignore)", 2)),
                                       shiny::hr(),
                                       selectizeInput("datatype", "Select data type:", 
                                                      c(".txt"="txt", ".csv"="csv", "Excel"="xlsx",  "Interface Standard"="itfstd", "Previous session"="sas", "DEMOS"="demos","Select file type"=""), 
@@ -162,7 +177,7 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                       conditionalPanel(condition = "input.datatype == 'txt'||input.datatype == 'csv'||input.datatype == 'csv'||input.datatype == 'xls'|| input.datatype == 'xlsx'",
                                                        checkboxInput("labels","Check if the variables have labels.",  F),
                                                        checkboxInput("namerows", "Check if the first column presents sample names.", F),
-                                                       ),
+                                      ),
                                       
                                       conditionalPanel(condition = "input.datatype == 'txt'||input.datatype == 'csv'||input.datatype == 'csv'",
                                                        selectInput("delim", "Delimiter:",
@@ -258,7 +273,7 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                            ),
                                            fluidRow(box(title = h3("Normal Q-Q Plot"), 
                                                         plotOutput("DAqqplot")),
-                                                    box(title = h3("Cumulative Distribuiton"),
+                                                    box(title = h3("Cumulative Distribution"),
                                                         plotOutput("DAcumulativedistributionplot")%>% withSpinner())
                                            )
                                   ),
@@ -311,8 +326,11 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                                         width = 12))
                                   ),
                                   tabPanel("Correlation HeatMap",
-                                           fluidRow(box(plotOutput("DAcorrHM")%>% withSpinner(), 
-                                                        width = 12)))
+                                           fluidRow(box(
+                                             selectInput("corrplottype", "Select Correlation Plot Type:", choices = c("Heatmap"="heatmap", "Pairs (be aware of long loading time)"="pairs", "Heatmap with dendogram"="clustheatmap")),
+                                             conditionalPanel(condition = "input.corrplottype == 'pairs'", checkboxInput("classheatmap", "Separate by classes?")),
+                                             plotOutput("DAcorrHM")%>% withSpinner(),
+                                             width = 12)))
                                   
                                 )),
                         
@@ -456,11 +474,11 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                                  collapsed = T , 
                                                  shiny::hr(),
                                                  
-                                                 box(h4("Savitzky-Golay"),
-                                                     shiny::hr(),
-                                                     width = 12, 
-                                                     status = "primary", 
-                                                     solidHeader = T,
+                                                 tabBox(
+                                                   width = 12,
+                                                   tabPanel(
+                                                     h5(strong("Savitzky-Golay")),
+                                                     h3(""),
                                                      radioButtons("linecolSG", "Apply Savitzky-Golay at:", 
                                                                   inline = T ,
                                                                   choices = c("Samples"="lineSG", "Variables"="colSG")),
@@ -478,29 +496,24 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                                                   value = 23,
                                                                   max = 301),
                                                      actionButton("usesavgol", "Apply Savitzky-Golay")),
-                                                 
-                                                 box(h4("Mooving Average"),
-                                                     shiny::hr(),
-                                                     width = 12,
-                                                     status = "primary",
-                                                     solidHeader = T,
-                                                     numericInput("windowsizeMA", "Select the window size:",
-                                                                  min = 3,
-                                                                  step = 1,
-                                                                  value = 23,
-                                                                  max = 301),
-                                                     actionButton("useMA", "Apply Moving Average")),
-                                                 
-                                                 box(h4("Derivative"),
-                                                     shiny::hr(),
-                                                     width = 12, 
-                                                     status = "primary",
-                                                     solidHeader = T,
-                                                     numericInput("difforderDV", "Select the differentiation order:",
-                                                                  min = 1,
-                                                                  step = 1,
-                                                                  value = 1),
-                                                     actionButton("useDV", "Apply Derivative"))
+                                                   
+                                                   tabPanel(h5(strong("Moving Average")), 
+                                                            h3(""),
+                                                            numericInput("windowsizeMA", "Select the window size:",
+                                                                         min = 3,
+                                                                         step = 1,
+                                                                         value = 23,
+                                                                         max = 301),
+                                                            actionButton("useMA", "Apply Moving Average")),
+                                                   
+                                                   tabPanel(h5(strong("Derivative")),
+                                                            h3(""),
+                                                            numericInput("difforderDV", "Select the differentiation order:",
+                                                                         min = 1,
+                                                                         step = 1,
+                                                                         value = 1),
+                                                            actionButton("useDV", "Apply Derivative"))
+                                                 )
                                              ),
                                              
                                              box(title=h3("Scatter Correction"),
@@ -509,29 +522,24 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                                  collapsible = T,
                                                  collapsed = T,
                                                  shiny::hr(),
-                                                 fluidRow(
-                                                   box(h4('Standard Normal Variate (SNV)'), 
-                                                       shiny::hr(),
-                                                       solidHeader = T, 
-                                                       status = "primary",
-                                                       width = 12,
-                                                       actionButton("usesnv", "Apply SNV"))),
                                                  
-                                                 shiny::hr(),
+                                                 tabBox(
+                                                   
+                                                   width = 12,
+                                                   
+                                                   tabPanel(h5(strong('Standard Normal Variate (SNV)')), 
+                                                      actionButton("usesnv", "Apply SNV")),
+                                             
                                                  
-                                                 fluidRow(
-                                                   box(h4('Multiplicative Scatter Correction (MSC)'), 
-                                                       width = 12, 
-                                                       status = "primary", 
-                                                       solidHeader = T,
+                                                   tabPanel(h5(strong('Multiplicative Scatter Correction (MSC)')),
                                                        checkboxInput("mscusemean", "Use mean", T), 
                                                        conditionalPanel(condition = "input.mscusemean == false",
                                                                         selectizeInput("mscreference", "Select spectrum for MSC reference", 
                                                                                        choices=c())),
                                                        actionButton("usemsc", "Apply MSC"))
+                                                   )
                                                  )
-                                             )
-                                           ),
+                                             ),
                                            
                                            fluidRow(
                                              
@@ -541,91 +549,104 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                                  collapsible = T,
                                                  collapsed = T,
                                                  shiny::hr(),
-                                                 box(h4('Offset Correction'),
-                                                     shiny::hr() ,
-                                                     solidHeader = T,
-                                                     status = "primary",
-                                                     width = 12 ,
-                                                     selectInput("typeoffset", "Select factor to subtract from each sample:",
-                                                                 choices = c("Minimum"="min", "Maximum"="max")),
-                                                     actionButton("useoffset", "Apply Offset Correction")), 
                                                  
-                                                 box(h4('Polynomial Correction'),
-                                                     shiny::hr() ,
-                                                     solidHeader = T,
-                                                     status = "primary",
-                                                     width = 12,
-                                                     numericInput("degreepolyPC", "Degree of Polynomial:", 
-                                                                  min = 1, 
-                                                                  value = 2, 
-                                                                  step = 1),
-                                                     numericInput("ittolPC", "Tolerance between iterations", 
-                                                                  value = 0.001,
-                                                                  step = 0.001),
-                                                     numericInput("maxitPC", "Select the maximum number of iterations:",
-                                                                  min = 1, 
-                                                                  value = 100),
-                                                     actionButton("usePC", "Apply Polynomial Correction")), 
-                                                 
-                                                 box(h4("Asymmetric Least Square"),
-                                                     shiny::hr(), 
-                                                     width = 12,
-                                                     status = "primary",
-                                                     solidHeader = T,
-                                                     numericInput("plambdaALS", "Select power of the penalty parameter (if plambda = 5, lambda = 10^5):", 
-                                                                  min = 2, 
-                                                                  step = 1,
-                                                                  value = 5,
-                                                                  max = 15),
-                                                     numericInput("assimetryALS", "Select the Asymmetry Ratio:", 
-                                                                  min = 0.001, 
-                                                                  step = 0.001, 
-                                                                  value = 0.01, 
-                                                                  max = 0.100),
-                                                     numericInput("maxiterALS", "Select the maximum number of iterations:",
-                                                                  min = 1, 
-                                                                  step = 1, 
-                                                                  value = 10),
-                                                     actionButton("useALS", "Apply ALS Correction")
+                                                 tabBox(
+                                                   width = 12,
+                                                   
+                                                   tabPanel(h5(strong('Simple Corrections')),
+                                                            fluidRow(box(h4('Offset Correction'),
+                                                                shiny::hr() ,
+                                                                solidHeader = T,
+                                                                status = "primary",
+                                                                width = 12 ,
+                                                                selectInput("typeoffset", "Select factor to subtract from each sample:",
+                                                                            choices = c("Minimum"="min", "Maximum"="max")),
+                                                                actionButton("useoffset", "Apply Offset Correction"))
+                                                             ), 
+                                                            
+                                                            fluidRow(box(h4('Polynomial Correction'),
+                                                                shiny::hr() ,
+                                                                solidHeader = T,
+                                                                status = "primary",
+                                                                width = 12,
+                                                                numericInput("degreepolyPC", "Degree of Polynomial:", 
+                                                                             min = 1, 
+                                                                             value = 2, 
+                                                                             step = 1),
+                                                                numericInput("ittolPC", "Tolerance between iterations", 
+                                                                             value = 0.001,
+                                                                             step = 0.001),
+                                                                numericInput("maxitPC", "Select the maximum number of iterations:",
+                                                                             min = 1, 
+                                                                             value = 100),
+                                                                actionButton("usePC", "Apply Polynomial Correction"))),
+                                                            
+                                                            ),
+                                                   
+                                                   tabPanel(h5(strong('Filter Methods')),
+                                                            fluidRow(box(h4('Low-Pass Fast Fourier Transform Filtering'), 
+                                                                shiny::hr() ,
+                                                                solidHeader = T,
+                                                                status = "primary", 
+                                                                width = 12 ,
+                                                                numericInput("steepLPF", "Steepness of filter curve:", 
+                                                                             value = 2),
+                                                                numericInput("halfpointLPF", "Half-way point of filter curve",
+                                                                             value = 5),
+                                                                actionButton("useLPF", "Apply Low-Pass Correction")
+                                                            )),
+                                                            ),
+                                                   tabPanel(h5(strong('Least-Square Based')),
+                                                            fluidRow(box(h4("Asymmetric Least Square"),
+                                                                shiny::hr(), 
+                                                                width = 12,
+                                                                status = "primary",
+                                                                solidHeader = T,
+                                                                numericInput("plambdaALS", "Select power of the penalty parameter (if plambda = 5, lambda = 10^5):", 
+                                                                             min = 2, 
+                                                                             step = 1,
+                                                                             value = 5,
+                                                                             max = 15),
+                                                                numericInput("assimetryALS", "Select the Asymmetry Ratio:", 
+                                                                             min = 0.001, 
+                                                                             step = 0.001, 
+                                                                             value = 0.01, 
+                                                                             max = 0.100),
+                                                                numericInput("maxiterALS", "Select the maximum number of iterations:",
+                                                                             min = 1, 
+                                                                             step = 1, 
+                                                                             value = 10),
+                                                                actionButton("useALS", "Apply ALS Correction")
+                                                            )),
+                                                           
+                                                            fluidRow(box(h4('Robust Baseline Estimation'), 
+                                                                shiny::hr() ,
+                                                                solidHeader = T, 
+                                                                status = "primary",
+                                                                width = 12 ,
+                                                                actionButton("useRBE", "Apply Robust Baseline Correction")
+                                                            )),
+                                                            
+                                                            fluidRow(box(h4('Iterative Restricted Least Squares'), 
+                                                                shiny::hr() ,
+                                                                solidHeader = T,
+                                                                status = "primary",
+                                                                width = 12 ,
+                                                                numericInput("lambda1IRLS", "2nd derivative constraint for primary smoothing:", 
+                                                                             min = 1,
+                                                                             value = 5,
+                                                                             step = 1),
+                                                                numericInput("lambda2IRLS", "2nd derivative constraint for secondary smoothing:",
+                                                                             min = 1, 
+                                                                             value = 9, 
+                                                                             step = 1),
+                                                                numericInput("maxitIRLS", "Select the maximum number of iterations:", 
+                                                                             min = 1, 
+                                                                             value = 200),
+                                                                actionButton("useIRLS", "Apply restricted least squares correction")))
+                                                            )
                                                  ),
-                                                 
-                                                 box(h4('Low-Pass Fast Fourier Transform Filtering'), 
-                                                     shiny::hr() ,
-                                                     solidHeader = T,
-                                                     status = "primary", 
-                                                     width = 12 ,
-                                                     numericInput("steepLPF", "Steepness of filter curve:", 
-                                                                  value = 2),
-                                                     numericInput("halfpointLPF", "Half-way point of filter curve",
-                                                                  value = 5),
-                                                     actionButton("useLPF", "Apply Low-Pass Correction")
-                                                 ),
-                                                 
-                                                 box(h4('Robust Baseline Estimation'), 
-                                                     shiny::hr() ,
-                                                     solidHeader = T, 
-                                                     status = "primary",
-                                                     width = 12 ,
-                                                     actionButton("useRBE", "Apply Robust Baseline Correction")
-                                                 ),
-                                                 
-                                                 box(h4('Iterative Restricted Least Squares'), 
-                                                     shiny::hr() ,
-                                                     solidHeader = T,
-                                                     status = "primary",
-                                                     width = 12 ,
-                                                     numericInput("lambda1IRLS", "2nd derivative constraint for primary smoothing:", 
-                                                                  min = 1,
-                                                                  value = 5,
-                                                                  step = 1),
-                                                     numericInput("lambda2IRLS", "2nd derivative constraint for secondary smoothing:",
-                                                                  min = 1, 
-                                                                  value = 9, 
-                                                                  step = 1),
-                                                     numericInput("maxitIRLS", "Select the maximum number of iterations:", 
-                                                                  min = 1, 
-                                                                  value = 200),
-                                                     actionButton("useIRLS", "Apply restricted least squares correction"))
+                                                
                                                  
                                              ),
                                              
@@ -750,6 +771,28 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                                             brush = "currentspectrabrushalign")
                                                  %>% withSpinner(), 
                                                  width = 12))),
+                                  tabPanel("Interactive Comparison Plot",
+                                           fluidRow(box(h3("Interactive Plots"),
+                                                        shiny::hr(),
+                                                        p("Keep in mind this plots may take several minutes to load, depending on the the dataset and computer settings. It's advisable to not run this, with you are using the web version of the app. While the plots are loading, please wait before doing anything else"),
+                                                        width = 12,
+                                                        shiny::hr(),
+                                                        actionButton("interactiveplots", "Run interactive Plots"))
+                                                    ),
+                                           fluidRow(
+                                             box(h3("Current data"),
+                                                 status = "primary", 
+                                                 solidHeader = T, 
+                                                 plotlyOutput("originaldataplotINT")%>% withSpinner(),
+                                                 width = 12)
+                                           ),
+                                           fluidRow(
+                                             box(h3("Changed data"),
+                                                 status = "success", 
+                                                 solidHeader = T, 
+                                                 plotlyOutput("changeddataplotINT")%>% withSpinner(),
+                                                 width = 12))
+                                           ),
                                   
                                   tabPanel("Review and confirm changes",
                                            fluidRow(box(h3("Confirm changes"),
@@ -1111,7 +1154,7 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                     fluidRow(
                                       column(
                                         width=12 ,
-                                        "acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement acknowledgement ")) 
+                                        "The authors are thankful to Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq), Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (CAPES) Finance Code 001, Fundação de Amparo à Pesquisa no Rio de Janeiro (FAPERJ) (grant number E-26/201.928/2020), and Universidade do Estado do Rio de Janeiro for their financial suppport. ASL has research scholarship from UERJ (Programa Pró-Ciência), FAPERJ (grant number E-26/202.552/2019), and CNPq (grant number 302465/2018-9)."                                        )) 
                                   )
                                 )
                         ),
@@ -1178,65 +1221,65 @@ server <- function(input, output) {
   
   #------DEMOS
   
-
   
-   #----Iris Dataset
-    observeEvent(c(input$demodata, input$datatype), {
-      req(input$datatype=='demos')
-      
-      if (input$demodata=='irisDEMO'){
-        updateCheckboxInput(inputId = "isspectra", value = F)
-        updateCheckboxInput(inputId = "classcol", value = T)
-      }
-    })
+  
+  #----Iris Dataset
+  observeEvent(c(input$demodata, input$datatype), {
+    req(input$datatype=='demos')
     
-    observeEvent(input$preview, {
-      
-      req(input$datatype=='demos')
-      req(input$demodata=='irisDEMO')
-      
-      data(data.frame(matrix(c(5.1,4.9,4.7,4.6,5.0,5.4,4.6,5.0,4.4,4.9,5.4,4.8,4.8,4.3,5.8,5.7,5.4,5.1,5.7,5.1,5.4,5.1,4.6,5.1,4.8,5.0,5.0,5.2,5.2,4.7,4.8,5.4,5.2,5.5,4.9,5.0,5.5,4.9,4.4,5.1,5.0,4.5,4.4,5.0,5.1,4.8,5.1,4.6,5.3,5.0,7.0,6.4,6.9,5.5,6.5,5.7,6.3,4.9,6.6,5.2,5.0,5.9,6.0,6.1,5.6,6.7,5.6,5.8,6.2,5.6,5.9,6.1,6.3,6.1,6.4,6.6,6.8,6.7,6.0,5.7,5.5,5.5,5.8,6.0,5.4,6.0,6.7,6.3,5.6,5.5,5.5,6.1,5.8,5.0,5.6,5.7,5.7,6.2,5.1,5.7,6.3,5.8,7.1,6.3,6.5,7.6,4.9,7.3,6.7,7.2,6.5,6.4,6.8,5.7,5.8,6.4,6.5,7.7,7.7,6.0,6.9,5.6,7.7,6.3,6.7,7.2,6.2,6.1,6.4,7.2,7.4,7.9,6.4,6.3,6.1,7.7,6.3,6.4,6.0,6.9,6.7,6.9,5.8,6.8,6.7,6.7,6.3,6.5,6.2,5.9,3.5,3.0,3.2,3.1,3.6,3.9,3.4,3.4,2.9,3.1,3.7,3.4,3.0,3.0,4.0,4.4,3.9,3.5,3.8,3.8,3.4,3.7,3.6,3.3,3.4,3.0,3.4,3.5,3.4,3.2,3.1,3.4,4.1,4.2,3.1,3.2,3.5,3.1,3.0,3.4,3.5,2.3,3.2,3.5,3.8,3.0,3.8,3.2,3.7,3.3,3.2,3.2,3.1,2.3,2.8,2.8,3.3,2.4,2.9,2.7,2.0,3.0,2.2,2.9,2.9,3.1,3.0,2.7,2.2,2.5,3.2,2.8,2.5,2.8,2.9,3.0,2.8,3.0,2.9,2.6,2.4,2.4,2.7,2.7,3.0,3.4,3.1,2.3,3.0,2.5,2.6,3.0,2.6,2.3,2.7,3.0,2.9,2.9,2.5,2.8,3.3,2.7,3.0,2.9,3.0,3.0,2.5,2.9,2.5,3.6,3.2,2.7,3.0,2.5,2.8,3.2,3.0,3.8,2.6,2.2,3.2,2.8,2.8,2.7,3.3,3.2,2.8,3.0,2.8,3.0,2.8,3.8,2.8,2.8,2.6,3.0,3.4,3.1,3.0,3.1,3.1,3.1,2.7,3.2,3.3,3.0,2.5,3.0,3.4,3.0,1.4,1.4,1.3,1.5,1.4,1.7,1.4,1.5,1.4,1.5,1.5,1.6,1.4,1.1,1.2,1.5,1.3,1.4,1.7,1.5,1.7,1.5,1.0,1.7,1.9,1.6,1.6,1.5,1.4,1.6,1.6,1.5,1.5,1.4,1.5,1.2,1.3,1.5,1.3,1.5,1.3,1.3,1.3,1.6,1.9,1.4,1.6,1.4,1.5,1.4,4.7,4.5,4.9,4.0,4.6,4.5,4.7,3.3,4.6,3.9,3.5,4.2,4.0,4.7,3.6,4.4,4.5,4.1,4.5,3.9,4.8,4.0,4.9,4.7,4.3,4.4,4.8,5.0,4.5,3.5,3.8,3.7,3.9,5.1,4.5,4.5,4.7,4.4,4.1,4.0,4.4,4.6,4.0,3.3,4.2,4.2,4.2,4.3,3.0,4.1,6.0,5.1,5.9,5.6,5.8,6.6,4.5,6.3,5.8,6.1,5.1,5.3,5.5,5.0,5.1,5.3,5.5,6.7,6.9,5.0,5.7,4.9,6.7,4.9,5.7,6.0,4.8,4.9,5.6,5.8,6.1,6.4,5.6,5.1,5.6,6.1,5.6,5.5,4.8,5.4,5.6,5.1,5.1,5.9,5.7,5.2,5.0,5.2,5.4,5.1,0.2,0.2,0.2,0.2,0.2,0.4,0.3,0.2,0.2,0.1,0.2,0.2,0.1,0.1,0.2,0.4,0.4,0.3,0.3,0.3,0.2,0.4,0.2,0.5,0.2,0.2,0.4,0.2,0.2,0.2,0.2,0.4,0.1,0.2,0.1,0.2,0.2,0.1,0.2,0.2,0.3,0.3,0.2,0.6,0.4,0.3,0.2,0.2,0.2,0.2,1.4,1.5,1.5,1.3,1.5,1.3,1.6,1.0,1.3,1.4,1.0,1.5,1.0,1.4,1.3,1.4,1.5,1.0,1.5,1.1,1.8,1.3,1.5,1.2,1.3,1.4,1.4,1.7,1.5,1.0,1.1,1.0,1.2,1.6,1.5,1.6,1.5,1.3,1.3,1.3,1.2,1.4,1.2,1.0,1.3,1.2,1.3,1.3,1.1,1.3,2.5,1.9,2.1,1.8,2.2,2.1,1.7,1.8,1.8,2.5,2.0,1.9,2.1,2.0,2.4,2.3,1.8,2.2,2.3,1.5,2.3,2.0,2.0,1.8,2.1,1.8,1.8,1.8,2.1,1.6,1.9,2.0,2.2,1.5,1.4,2.3,2.4,1.8,1.8,2.1,2.4,2.3,1.9,2.3,2.5,2.3,1.9,2.0,2.3,1.8
+    if (input$demodata=='irisDEMO'){
+      updateCheckboxInput(inputId = "isspectra", value = F)
+      updateCheckboxInput(inputId = "classcol", value = T)
+    }
+  })
+  
+  observeEvent(input$preview, {
+    
+    req(input$datatype=='demos')
+    req(input$demodata=='irisDEMO')
+    
+    data(data.frame(matrix(c(5.1,4.9,4.7,4.6,5.0,5.4,4.6,5.0,4.4,4.9,5.4,4.8,4.8,4.3,5.8,5.7,5.4,5.1,5.7,5.1,5.4,5.1,4.6,5.1,4.8,5.0,5.0,5.2,5.2,4.7,4.8,5.4,5.2,5.5,4.9,5.0,5.5,4.9,4.4,5.1,5.0,4.5,4.4,5.0,5.1,4.8,5.1,4.6,5.3,5.0,7.0,6.4,6.9,5.5,6.5,5.7,6.3,4.9,6.6,5.2,5.0,5.9,6.0,6.1,5.6,6.7,5.6,5.8,6.2,5.6,5.9,6.1,6.3,6.1,6.4,6.6,6.8,6.7,6.0,5.7,5.5,5.5,5.8,6.0,5.4,6.0,6.7,6.3,5.6,5.5,5.5,6.1,5.8,5.0,5.6,5.7,5.7,6.2,5.1,5.7,6.3,5.8,7.1,6.3,6.5,7.6,4.9,7.3,6.7,7.2,6.5,6.4,6.8,5.7,5.8,6.4,6.5,7.7,7.7,6.0,6.9,5.6,7.7,6.3,6.7,7.2,6.2,6.1,6.4,7.2,7.4,7.9,6.4,6.3,6.1,7.7,6.3,6.4,6.0,6.9,6.7,6.9,5.8,6.8,6.7,6.7,6.3,6.5,6.2,5.9,3.5,3.0,3.2,3.1,3.6,3.9,3.4,3.4,2.9,3.1,3.7,3.4,3.0,3.0,4.0,4.4,3.9,3.5,3.8,3.8,3.4,3.7,3.6,3.3,3.4,3.0,3.4,3.5,3.4,3.2,3.1,3.4,4.1,4.2,3.1,3.2,3.5,3.1,3.0,3.4,3.5,2.3,3.2,3.5,3.8,3.0,3.8,3.2,3.7,3.3,3.2,3.2,3.1,2.3,2.8,2.8,3.3,2.4,2.9,2.7,2.0,3.0,2.2,2.9,2.9,3.1,3.0,2.7,2.2,2.5,3.2,2.8,2.5,2.8,2.9,3.0,2.8,3.0,2.9,2.6,2.4,2.4,2.7,2.7,3.0,3.4,3.1,2.3,3.0,2.5,2.6,3.0,2.6,2.3,2.7,3.0,2.9,2.9,2.5,2.8,3.3,2.7,3.0,2.9,3.0,3.0,2.5,2.9,2.5,3.6,3.2,2.7,3.0,2.5,2.8,3.2,3.0,3.8,2.6,2.2,3.2,2.8,2.8,2.7,3.3,3.2,2.8,3.0,2.8,3.0,2.8,3.8,2.8,2.8,2.6,3.0,3.4,3.1,3.0,3.1,3.1,3.1,2.7,3.2,3.3,3.0,2.5,3.0,3.4,3.0,1.4,1.4,1.3,1.5,1.4,1.7,1.4,1.5,1.4,1.5,1.5,1.6,1.4,1.1,1.2,1.5,1.3,1.4,1.7,1.5,1.7,1.5,1.0,1.7,1.9,1.6,1.6,1.5,1.4,1.6,1.6,1.5,1.5,1.4,1.5,1.2,1.3,1.5,1.3,1.5,1.3,1.3,1.3,1.6,1.9,1.4,1.6,1.4,1.5,1.4,4.7,4.5,4.9,4.0,4.6,4.5,4.7,3.3,4.6,3.9,3.5,4.2,4.0,4.7,3.6,4.4,4.5,4.1,4.5,3.9,4.8,4.0,4.9,4.7,4.3,4.4,4.8,5.0,4.5,3.5,3.8,3.7,3.9,5.1,4.5,4.5,4.7,4.4,4.1,4.0,4.4,4.6,4.0,3.3,4.2,4.2,4.2,4.3,3.0,4.1,6.0,5.1,5.9,5.6,5.8,6.6,4.5,6.3,5.8,6.1,5.1,5.3,5.5,5.0,5.1,5.3,5.5,6.7,6.9,5.0,5.7,4.9,6.7,4.9,5.7,6.0,4.8,4.9,5.6,5.8,6.1,6.4,5.6,5.1,5.6,6.1,5.6,5.5,4.8,5.4,5.6,5.1,5.1,5.9,5.7,5.2,5.0,5.2,5.4,5.1,0.2,0.2,0.2,0.2,0.2,0.4,0.3,0.2,0.2,0.1,0.2,0.2,0.1,0.1,0.2,0.4,0.4,0.3,0.3,0.3,0.2,0.4,0.2,0.5,0.2,0.2,0.4,0.2,0.2,0.2,0.2,0.4,0.1,0.2,0.1,0.2,0.2,0.1,0.2,0.2,0.3,0.3,0.2,0.6,0.4,0.3,0.2,0.2,0.2,0.2,1.4,1.5,1.5,1.3,1.5,1.3,1.6,1.0,1.3,1.4,1.0,1.5,1.0,1.4,1.3,1.4,1.5,1.0,1.5,1.1,1.8,1.3,1.5,1.2,1.3,1.4,1.4,1.7,1.5,1.0,1.1,1.0,1.2,1.6,1.5,1.6,1.5,1.3,1.3,1.3,1.2,1.4,1.2,1.0,1.3,1.2,1.3,1.3,1.1,1.3,2.5,1.9,2.1,1.8,2.2,2.1,1.7,1.8,1.8,2.5,2.0,1.9,2.1,2.0,2.4,2.3,1.8,2.2,2.3,1.5,2.3,2.0,2.0,1.8,2.1,1.8,1.8,1.8,2.1,1.6,1.9,2.0,2.2,1.5,1.4,2.3,2.4,1.8,1.8,2.1,2.4,2.3,1.9,2.3,2.5,2.3,1.9,2.0,2.3,1.8
     ),
-      nrow = 150, ncol = 4, byrow = F)
-      ))
-      matrix<-data()
-      
-      sampleclassX<-c("setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica",'virginica',"virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica"
-)
-      sampleclass(t(sampleclassX))
-      
-      
-      # sampleclasscolourX<-c("100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99"
-      # )
-      # sampleclasscolour(t(sampleclasscolourX))
-      
-      
-      variablesX<-c("sepal_length",	"sepal_width",	"petal_length",	"petal_width"
-)
-      variables(t(variablesX))
-      colnames(matrix)<-t(variables())
-      
-      
-      idX<-c('Sample 1','Sample 2','Sample 3','Sample 4','Sample 5','Sample 6','Sample 7','Sample 8','Sample 9','Sample 10','Sample 11','Sample 12','Sample 13','Sample 14','Sample 15','Sample 16','Sample 17','Sample 18','Sample 19','Sample 20','Sample 21','Sample 22','Sample 23','Sample 24','Sample 25','Sample 26','Sample 27','Sample 28','Sample 29','Sample 30','Sample 31','Sample 32','Sample 33','Sample 34','Sample 35','Sample 36','Sample 37','Sample 38','Sample 39','Sample 40','Sample 41','Sample 42','Sample 43','Sample 44','Sample 45','Sample 46','Sample 47','Sample 48','Sample 49','Sample 50','Sample 51','Sample 52','Sample 53','Sample 54','Sample 55','Sample 56','Sample 57','Sample 58','Sample 59','Sample 60','Sample 61','Sample 62','Sample 63','Sample 64','Sample 65','Sample 66','Sample 67','Sample 68','Sample 69','Sample 70','Sample 71','Sample 72','Sample 73','Sample 74','Sample 75','Sample 76','Sample 77','Sample 78','Sample 79','Sample 80','Sample 81','Sample 82','Sample 83','Sample 84','Sample 85','Sample 86','Sample 87','Sample 88','Sample 89','Sample 90','Sample 91','Sample 92','Sample 93','Sample 94','Sample 95','Sample 96','Sample 97','Sample 98','Sample 99','Sample 100','Sample 101','Sample 102','Sample 103','Sample 104','Sample 105','Sample 106','Sample 107','Sample 108','Sample 109','Sample 110','Sample 111','Sample 112','Sample 113','Sample 114','Sample 115','Sample 116','Sample 117','Sample 118','Sample 119','Sample 120','Sample 121','Sample 122','Sample 123','Sample 124','Sample 125','Sample 126','Sample 127','Sample 128','Sample 129','Sample 130','Sample 131','Sample 132','Sample 133','Sample 134','Sample 135','Sample 136','Sample 137','Sample 138','Sample 139','Sample 140','Sample 141','Sample 142','Sample 143','Sample 144','Sample 145','Sample 146','Sample 147','Sample 148','Sample 149','Sample 150'
-)
-      id(t(idX))
-      rownames(matrix)<-t(id())
-      
-      data(matrix)
-      
-      
-      pretreatdata(data())
-      pretreatvariables(variables())
-      imputedata(data())
-      transformdata(data())
-      
-    })
+    nrow = 150, ncol = 4, byrow = F)
+    ))
+    matrix<-data()
     
+    sampleclassX<-c("setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica",'virginica',"virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica"
+    )
+    sampleclass((sampleclassX))
+    
+    
+    # sampleclasscolourX<-c("100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99"
+    # )
+    # sampleclasscolour(t(sampleclasscolourX))
+    
+    
+    variablesX<-c("sepal_length",	"sepal_width",	"petal_length",	"petal_width"
+    )
+    variables(t(variablesX))
+    colnames(matrix)<-t(variables())
+    
+    
+    idX<-c('Sample 1','Sample 2','Sample 3','Sample 4','Sample 5','Sample 6','Sample 7','Sample 8','Sample 9','Sample 10','Sample 11','Sample 12','Sample 13','Sample 14','Sample 15','Sample 16','Sample 17','Sample 18','Sample 19','Sample 20','Sample 21','Sample 22','Sample 23','Sample 24','Sample 25','Sample 26','Sample 27','Sample 28','Sample 29','Sample 30','Sample 31','Sample 32','Sample 33','Sample 34','Sample 35','Sample 36','Sample 37','Sample 38','Sample 39','Sample 40','Sample 41','Sample 42','Sample 43','Sample 44','Sample 45','Sample 46','Sample 47','Sample 48','Sample 49','Sample 50','Sample 51','Sample 52','Sample 53','Sample 54','Sample 55','Sample 56','Sample 57','Sample 58','Sample 59','Sample 60','Sample 61','Sample 62','Sample 63','Sample 64','Sample 65','Sample 66','Sample 67','Sample 68','Sample 69','Sample 70','Sample 71','Sample 72','Sample 73','Sample 74','Sample 75','Sample 76','Sample 77','Sample 78','Sample 79','Sample 80','Sample 81','Sample 82','Sample 83','Sample 84','Sample 85','Sample 86','Sample 87','Sample 88','Sample 89','Sample 90','Sample 91','Sample 92','Sample 93','Sample 94','Sample 95','Sample 96','Sample 97','Sample 98','Sample 99','Sample 100','Sample 101','Sample 102','Sample 103','Sample 104','Sample 105','Sample 106','Sample 107','Sample 108','Sample 109','Sample 110','Sample 111','Sample 112','Sample 113','Sample 114','Sample 115','Sample 116','Sample 117','Sample 118','Sample 119','Sample 120','Sample 121','Sample 122','Sample 123','Sample 124','Sample 125','Sample 126','Sample 127','Sample 128','Sample 129','Sample 130','Sample 131','Sample 132','Sample 133','Sample 134','Sample 135','Sample 136','Sample 137','Sample 138','Sample 139','Sample 140','Sample 141','Sample 142','Sample 143','Sample 144','Sample 145','Sample 146','Sample 147','Sample 148','Sample 149','Sample 150'
+    )
+    id(t(idX))
+    rownames(matrix)<-t(id())
+    
+    data(matrix)
+    
+    
+    pretreatdata(data())
+    pretreatvariables(variables())
+    imputedata(data())
+    transformdata(data())
+    
+  })
   
-   #----Ceramic
-    observeEvent(c(input$demodata, input$datatype), {
-      req(input$datatype=='demos')
-      
+  
+  #----Ceramic
+  observeEvent(c(input$demodata, input$datatype), {
+    req(input$datatype=='demos')
+    
     if (input$demodata=='ceramicDEMO'){
       updateCheckboxInput(inputId = "isspectra", value = F)
       updateCheckboxInput(inputId = "classcol", value = T)
@@ -1256,12 +1299,12 @@ server <- function(input, output) {
     
     sampleclassX<-c("Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Body","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze","Glaze"
     )
-    sampleclass(t(sampleclassX))
+    sampleclass((sampleclassX))
     
     
     sampleclasscolourX<-c("100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","100","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99","99"
     )
-    sampleclasscolour(t(sampleclasscolourX))
+    sampleclasscolour((sampleclasscolourX))
     
     
     variablesX<-c("Na2O","MgO","Al2O3","SiO2","K2O","CaO","TiO2","Fe2O3","MnO","CuO","ZnO")
@@ -1292,9 +1335,9 @@ server <- function(input, output) {
       updateCheckboxInput(inputId = "isspectra", value = T)
       updateCheckboxInput(inputId = "classcol", value = T)
     }
-    })
-    
-    
+  })
+  
+  
   observeEvent(input$preview, {
     
     req(input$datatype=='demos')
@@ -1317,6 +1360,7 @@ server <- function(input, output) {
     sampleclasscolourX<-c(100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,99,99,99,99,99,99,99,99,99,99,99,99,99,99,99
     )
     sampleclasscolour((sampleclasscolourX))
+    
     
     
     variablesX<-c(200,204,208,212,216,220,224,228,232,236,240,244,248,252,256,260,264,268,272,276,280,284,288,292,296,300,304,308,312,316,320,324,328
@@ -1450,17 +1494,28 @@ server <- function(input, output) {
     req(input$datatype != "demos")
     req(input$file)
     
+    
     if (input$classcol==T)
-    {matrix<-newdata()
-    unique<-unique(matrix[[1]])
+    {
+      
+      if(input$namerows == T){
+        classpos<-input$classpos-1
+      }
+      
+      if(input$namerows == F){
+        classpos<-input$classpos
+      }  
+      
+    matrix<-newdata()
+    unique<-unique(matrix[[classpos]])
     length<-length(unique)
     numbers<-c(100:length)
     
     for (i in 1:length)
-      matrix[[1]][matrix[[1]]==unique[[i]]]<-numbers[[i]]
-    matrix[[1]]
+      matrix[[classpos]][matrix[[classpos]]==unique[[i]]]<-numbers[[i]]
+    matrix[[classpos]]
     
-    sampleclasscolour(matrix[[1]])}
+    sampleclasscolour(matrix[[classpos]])}
     
     else
       sampleclasscolour(0)
@@ -1474,14 +1529,24 @@ server <- function(input, output) {
     req(input$datatype != "demos")
     req(input$file)
     
+    if(input$namerows == T){
+      classpos<-input$classpos-1
+    }
+    
+    if(input$namerows == F){
+      classpos<-input$classpos
+    }
+    
+    
+    
     if (input$classcol==T)
-    {matrix<-newdata()[,1]
+    {matrix<-newdata()[,classpos]
     
     if (is.data.frame(matrix)==F)
       sampleclass(matrix)
     
     if(is.data.frame(matrix)==T)
-      sampleclass(matrix[[1]]) 
+      sampleclass(matrix[[classpos]]) 
     
     }
     
@@ -1494,12 +1559,20 @@ server <- function(input, output) {
   #----------------------------------------------------------------------------------End of data importation--------------------------------------------  
   observeEvent(input$preview,{
     
+    if(input$namerows == T){
+      classpos<-input$classpos-1
+    }
+    
+    if(input$namerows == F){
+      classpos<-input$classpos
+    }
+    
     req(input$file)
     req(input$datatype != "itfstd")
     req(input$datatype != "demos")
     
     if (input$classcol==T)
-    {data(newdata()[,-1])}
+    {data(newdata()[,-c(classpos)])}
     
     
     else
@@ -1550,7 +1623,7 @@ server <- function(input, output) {
   })
   
   #----------------------------------------------------------------------------Remove data option----------------------------------------------------------
-  observeEvent(data(), {req(input$file)
+  observeEvent(data(), {
     req(data())
     
     updateSelectizeInput(inputId = "removedatacol", choices = list(as.character(t(variables()))), selected = NULL, server = T)
@@ -1574,12 +1647,16 @@ server <- function(input, output) {
   
   observeEvent(input$removedatarowBT, {
     req(data())
+    
     newdata<-data()[-which(dimnames(data())[[1]] %in% input$removedatarow),]
+    matrix<-sampleclass()[-which(rownames(data()) %in% input$removedatarow)]
+    matrix2<-sampleclasscolour()[-which(rownames(data()) %in% input$removedatarow)]
     
     data(newdata)
     id(rownames(data()))
-    sampleclass()[which(id()!=input$removedatarow)]
-    sampleclasscolour()[which(id()!=input$removedatarow)]
+    
+    sampleclass(matrix)
+    sampleclasscolour(matrix2)
     
     imputedata(data())
     transformdata(data())
@@ -1609,7 +1686,7 @@ server <- function(input, output) {
       )
       
       dupmatrix3<-dupmatrix2[order(dupmatrix2[,1]),]
-      output$checkdup<-renderPrint(dupmatrix3)  
+      output$checkdup<-renderPrint(paste0("Samples ",list(rownames(unique(data()[which(duplicated(data())),]))), " are duplicate of others. It is advised to remove them"))  
       }
       
       showModal(modalDialog(title = "Warning" ,paste0("Samples ",list(rownames(unique(data()[which(duplicated(data())),]))), " have/are duplicates. Check which of then relate by viewing the 'Duplicated Values' tab at 'Data Overview'")
@@ -1857,22 +1934,40 @@ server <- function(input, output) {
   })
   
   #----------------------------------CorrheatMap
-  observeEvent(data(), 
-               
-               output$DAcorrHM<-renderPlot(
-                 {validate(need(isTRUE(ncol(data())>100)==F, message = "There are too many variables"))
-                   
-                   data0<-data()
-                   matrix<-which(sapply(data0, is.numeric))
-                   matrix2<-data0[,matrix]
-                   
-                   col<-colorRampPalette(c("blue","white","red"))(200)
-                   cor<-cor(matrix2)
-                   corrplot(cor, method = "color", col = col, type = "upper", addCoef.col = "black", tl.col = "black", tl.srt = 60, diag = F)
-                 }, 
-                 
-                 height = 1000))
-  
+  observeEvent(c(data(), input$corrplottype, input$classheatmap),{validate(need(isTRUE(ncol(data())>100)==F, message = "There are too many variables"))
+    
+    if(input$corrplottype == "pairs"){
+      
+      if(input$classheatmap == T){
+        output$DAcorrHM<-renderPlot(ggpairs(data(), aes(color = sampleclass(), alpha = 0.5)), height = 1000)
+      }
+      
+      if(input$classheatmap == F){
+        output$DAcorrHM<-renderPlot(ggpairs(data(), height = 1000))
+      }
+    }
+    
+    
+    if(input$corrplottype == "heatmap"){
+      output$DAcorrHM<-renderPlot({ 
+        data0<-data()
+        matrix<-which(sapply(data0, is.numeric))
+        matrix2<-data0[,matrix]
+        
+        col<-colorRampPalette(c("blue","white","red"))(200)
+        cor<-cor(matrix2)
+        corrplot(cor, method = "color", col = col, type = "upper", addCoef.col = "black", tl.col = "black", tl.srt = 60, diag = F)
+        
+      }, height = 1000)
+    }
+    
+    if(input$corrplottype == "clustheatmap"){
+      output$DAcorrHM<-renderPlot(heatmap(data.matrix(data())), height = 1000)
+    }
+    
+    
+    
+  })
   #--------------------------------------------------------------------------------------------IMPUTATION--------------------------------------------------------------------------------   
   
   observeEvent(c(variables(), input$confirmpretreat),{req(data())
@@ -2078,6 +2173,116 @@ server <- function(input, output) {
       pretreatvariables(data.frame(colnames(pretreatdata())))
   })
   
+  observeEvent(input$interactiveplots, ignoreInit = T, {
+    
+    req(data())
+    
+    showModal(modalDialog(title = "Please wait:", "The calculations are running and may take a several minutes. This window will be automatically closed when they are finished.", easyClose = F, footer = ""))
+    
+    tpretreatdata<-data.frame(t(pretreatdata()))
+    tdata<-data.frame(t(data()))
+    pretreatvariables<-pretreatvariables()
+    id<-id()
+    variables<-variables()
+    
+    output$originaldataplotINT<-renderPlotly({
+      t <- list(
+        family = "times",
+        size = 12,
+        color = toRGB("grey50"))
+      
+      Plot <-  plot_ly(type="scatter",
+                       data=tdata,
+                       x=data.frame(t(variables), check.names = F),
+                       y=tdata[,1],
+                       mode="lines",
+                       #options=c(),
+                       showlegend=T,
+                       #text=data2,
+                       text="",
+                       name = data.frame(t(id))[,1],
+                       #color = colnames(loadings)[[1]],
+                       hoverinfo="skip")%>%
+        add_text(textposition="topright", textfont=t)%>%
+        layout(title="<b>Original Spectra</b>",
+               xaxis=list(title=paste0(""),zerolinecolor="lightgrey"),
+               yaxis=list(title=paste0(""),zerolinecolor="lightgrey"))
+      
+      for (i in 2:ncol(tpretreatdata)) {
+        
+        Plot<-add_trace(Plot,
+                        y=tdata[,i],
+                        mode="lines",
+                        showlegend=T,
+                        #text=data2,
+                        text="",
+                        name = data.frame(t(id))[,i],
+                        #color = colnames(loadings)[[i]],
+                        hoverinfo="skip")
+        #add_text(textposition="topright", textfont=t)%>%
+        
+        
+      }
+      
+      
+      Plot
+    
+    
+    })
+    
+    output$changeddataplotINT<-renderPlotly({
+      t <- list(
+        family = "times",
+        size = 12,
+        color = toRGB("grey50"))
+      
+     Plot <-  plot_ly(type="scatter",
+                       data=tpretreatdata,
+                       x=data.frame(t(pretreatvariables), check.names = F),
+                       y=tpretreatdata[,1],
+                       mode="lines",
+                       #options=c(),
+                       showlegend=T,
+                       #text=data2,
+                       text="",
+                       name = data.frame(t(id))[,1],
+                       #color = colnames(loadings)[[1]],
+                       hoverinfo="skip")%>%
+        add_text(textposition="topright", textfont=t)%>%
+        layout(title="<b>Changed Spectra</b>",
+               xaxis=list(title=paste0(""),zerolinecolor="lightgrey"),
+               yaxis=list(title=paste0(""),zerolinecolor="lightgrey"))
+      
+      for (i in 2:ncol(tpretreatdata)) {
+        
+        Plot<-add_trace(Plot,
+                        y=tpretreatdata[,i],
+                        mode="lines",
+                        showlegend=T,
+                        #text=data2,
+                        text="",
+                        name = data.frame(t(id))[,i],
+                        #color = colnames(loadings)[[i]],
+                        hoverinfo="skip")
+        #add_text(textposition="topright", textfont=t)%>%
+        
+        
+      }
+      
+      
+      Plot
+      
+      
+    })
+    
+    removeModal()
+    
+  })
+  
+  
+  
+  
+  
   
   output$currentspectraprepro<-renderPlot(matplot(y=t(pretreatdata()), x=pretreatvariables(), type = "l", ylab = "", xlab = "", lty = 1, col = ))
   output$currentspectrapreprocut<-renderPlot(matplot(y=t(pretreatdata()), x=pretreatvariables(), type = "l", ylab = "", xlab = "", lty = 1, col = )) #com escala
@@ -2153,7 +2358,8 @@ server <- function(input, output) {
   })
   observeEvent(input$useMA,{
     matrix<-movav(pretreatdata(), input$windowsizeMA)
-    pretreatdata(matrix)
+    pretreatdata(data.frame(matrix, check.names = F))
+    pretreatvariables(data.frame(as.double(sub(',','.',colnames(pretreatdata())))))
   })
   #---------------------------SNV
   observeEvent(input$usesnv,{req(data())
@@ -2177,7 +2383,8 @@ server <- function(input, output) {
   #-------------------------Simple derivative
   observeEvent(input$useDV,{req(data())
     matrix<-t(diff(t(pretreatdata()), differences = input$difforderDV))
-    pretreatdata(matrix)
+    pretreatdata(data.frame(matrix, check.names = F))
+    pretreatvariables(data.frame(as.double(sub(',','.',colnames(pretreatdata())))))
   })
   
   
@@ -2211,7 +2418,7 @@ server <- function(input, output) {
     showModal(modalDialog(title = "Please wait:", "The calculations are running and may take a few seconds. This window will be automatically closed when they are finished.", easyClose = F, footer = ""))
     
     matrix<-data.matrix(pretreatdata())
-    matrix2<-baseline(matrix, method = "modpolyfit", degree=input$degreepolyPC, tol = input$ittolPC, rep = input$maxitPC)
+    matrix2<-baseline::baseline(matrix, method = "modpolyfit", degree=input$degreepolyPC, tol = input$ittolPC, rep = input$maxitPC)
     matrix3<-matrix2@corrected
     colnames(matrix3)<-t(pretreatvariables())
     
