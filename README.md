@@ -7,6 +7,8 @@ This repository is the colection of all chemometrics apps developed by our group
 - Licarion Pinto (licarion@gmail.com)
 - Aderval Luna (adsluna@gmail.com)
 
+Please answer the following questionnaire to help us enhance the interface:
+https://docs.google.com/forms/d/1js1Wyf81-8oG6u2w3F9lswMV3MUjX6srkBYWkkOj7Zw/edit?ts=633b6a1f
 
 ## Installation
 
