@@ -7,44 +7,6 @@ This repository is the colection of all chemometrics apps developed by our group
 - Licarion Pinto (licarion@gmail.com)
 - Aderval Luna (adsluna@gmail.com)
 
-## Installation
-
-It is necessary to have the R and RStudio previously installed in your computer.
-
-### Packages Installation
-- Search the GitHub directory for the .R file contaning the packages for the required app
-
-   > - Open the file
-   > - Righ-Click the "raw" option
-   > - Click "Save link as" and change the file extension from ".txt" to ".R"
-   > - Open the file in RStudio and run all of it
-
-### App Installation
-
-#### From GitHub:
-- Install the required packages as explained above, then:
-
-   > - Open the file
-   > - Righ-Click the "raw" option
-   > - Click "Save link as" and change the file extension from ".txt" to ".R" 
-   > - Open the downloaded file into RStudio then click "Run App" on the top righ corner of the file
-
-#### From .txt file:
-- Install the required packages as explained above, then:
-- Open RStudio the go to:
-
-  > - File
-  > - New File
-  > - Shiny Web App 
-  > - Paste the code then click "Run App" on the top righ corner of the file
-- Then erase all the file content and copy the code into the new file
-- When running the app for the first time, an option to install the required packages should appear ate the top of the window if you did not install them previously.
-- If you have problems with the encoding when running the app, go to: 
-  
-  > - File
-  > - Save with encoding
-  > - UTF-8
-
 ## Data Handling: Chemometrics R-Web App 1 ![image](https://img.shields.io/badge/Version-DH--1.2-blueviolet)
 - This app is currently available for online usage in [this link](https://licarionpinto.shinyapps.io/Data_Handling_app/)
 - Complete change log can be seen inside the code
@@ -80,4 +42,43 @@ It is necessary to have the R and RStudio previously installed in your computer.
 
   - Variables Preprocessing
     - Simple Operations (mean centering, scaling, autoscaling, logarithmic transformation and frobenius normalization)
-    - Normality inducing transformations (Box-Cox and Yeo-Jhonson)
+    - Normality inducing transformations (Box-Cox and Yeo-Jhonson)   
+    
+## Installation
+
+It is necessary to have the R and RStudio previously installed in your computer.
+
+### Packages and Dependencies Installation
+- Search the GitHub directory for the .R file contaning the packages for the required app (the names of the files for dependencies and the app itself should be similar)
+
+   > - Open the file
+   > - Righ-Click the "raw" option
+   > - Click "Save link as" and change the file extension from ".txt" to ".R"
+   > - Open the file in RStudio and run all of it
+
+### App Installation
+
+#### From GitHub:
+- Install the required packages as explained above, then:
+
+   > - Open the file
+   > - Righ-Click the "raw" option
+   > - Click "Save link as" and change the file extension from ".txt" to ".R" 
+   > - Open the downloaded file into RStudio then click "Run App" on the top righ corner of the file
+
+#### From .txt file:
+- Install the required packages as explained above, then:
+- Open RStudio the go to:
+
+  > - File
+  > - New File
+  > - Shiny Web App 
+  > - Paste the code then click "Run App" on the top righ corner of the file
+- Then erase all the file content and copy the code into the new file
+- When running the app for the first time, an option to install the required packages should appear ate the top of the window if you did not install them previously.
+- If you have problems with the encoding when running the app, go to: 
+  
+  > - File
+  > - Save with encoding
+  > - UTF-8
+
