@@ -19,9 +19,11 @@
 #CHANGE LOG 
 
 # Version 1.0
+
 # - Launch
 
-# Version 1.1  
+# Version 1.1
+
 # - New and improved correlation map
 # - Boxplot and histogram boxes now have matching sizes and their plots align for better printing capability
 # - Settings and Normality tests boxes now have the same sizes
@@ -38,10 +40,13 @@
 
 
 # Version 1.2
+
 # - Corrected Moving average and simple derivative processing
 # - Added new ways to visualize the correlation in the data
 # - Added de interactive spectral plot feature
 # - Added new spectral pretreatment layout
+# - Added per class univariate normality tests
+# - Corrected some PTW alignement bugs
 #-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
 
 library(IDPmisc)
@@ -256,8 +261,9 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                                         shiny::hr(),
                                                         checkboxInput("DAclassselection", "Check to show samples plot separated by class.")),
                                                     box(title = h3("Normality Tests"),
-                                                        height = 280,
-                                                        width = 8, 
+                                                        #height = 280,
+                                                        width = 8,
+                                                        conditionalPanel(condition = "input.DAclassselection == true", selectInput("whichclass", "Select the class to calculate tests:", choices = c())),
                                                         verbatimTextOutput("DAnormtests"))
                                            ),
                                            fluidRow(box(title=h3("Boxplot"),
@@ -687,7 +693,7 @@ ui <- dashboardPage(title = "UERJ - Data Handling App",
                                            
                                            fluidRow(
                                              box(h3("Current Spectra"),
-                                                 plotOutput("currentspectraprepro")%>% withSpinner(),
+                                                 plotlyOutput("currentspectraprepro")%>% withSpinner(),
                                                  width = 12))
                                   ),
                                   
@@ -1750,24 +1756,39 @@ server <- function(input, output) {
   
   observeEvent(c(variables(), input$confirmpretreat),{req(data())
     updateSelectizeInput(inputId = "DAvariableselect", choices = list(as.character(t(variables()))), server = T)
+    updateSelectInput(inputId = "whichclass", choices = unique(sampleclass()))
   })
   
   
   #-----------------Analysis per variable
-  observeEvent(c(input$DAvariableselect, input$DAclassselection, data()) , {req(data())
+  observeEvent(c(input$DAvariableselect, input$DAclassselection, data(), input$whichclass) , {req(data())
     
     req(input$DAvariableselect)
     validate(need(is.numeric(data()[[input$DAvariableselect]]) == T, message = "Non numeric variable selected"))
     
-    
-    if ((isTRUE(nrow(data())<5000)==T) && ( isTRUE(length(data()[[input$DAvariableselect]])>7)==T))
+     if ((isTRUE(nrow(data())<5000)==T) && ( isTRUE(length(data()[[input$DAvariableselect]])>7)==T)){
       
-    {t1 <- ks.test(x=data()[[input$DAvariableselect]], "pnorm") # KS
-    t2 <- lillie.test(data()[[input$DAvariableselect]]) # Lilliefors
-    t3 <- cvm.test(data()[[input$DAvariableselect]]) # Cramer-von Mises
-    t4 <- shapiro.test(data()[[input$DAvariableselect]]) # Shapiro-Wilk
-    t5 <- sf.test(data()[[input$DAvariableselect]]) # Shapiro-Francia
-    t6 <- ad.test(data()[[input$DAvariableselect]]) # Anderson-Darling
+     if (input$DAclassselection == T){
+       Class<-which(sampleclass() == input$whichclass)
+       
+       t1 <- ks.test(x=data()[[input$DAvariableselect]][Class], "pnorm") # KS
+       t2 <- lillie.test(data()[[input$DAvariableselect]][Class]) # Lilliefors
+       t3 <- cvm.test(data()[[input$DAvariableselect]][Class]) # Cramer-von Mises
+       t4 <- shapiro.test(data()[[input$DAvariableselect]][Class]) # Shapiro-Wilk
+       t5 <- sf.test(data()[[input$DAvariableselect]][Class]) # Shapiro-Francia
+       t6 <- ad.test(data()[[input$DAvariableselect]][Class]) # Anderson-Darling
+     }
+      
+     if(input$DAclassselection == F){
+       
+       t1 <- ks.test(x=data()[[input$DAvariableselect]], "pnorm") # KS
+       t2 <- lillie.test(data()[[input$DAvariableselect]]) # Lilliefors
+       t3 <- cvm.test(data()[[input$DAvariableselect]]) # Cramer-von Mises
+       t4 <- shapiro.test(data()[[input$DAvariableselect]]) # Shapiro-Wilk
+       t5 <- sf.test(data()[[input$DAvariableselect]]) # Shapiro-Francia
+       t6 <- ad.test(data()[[input$DAvariableselect]]) # Anderson-Darling
+     }
+    
     
     # Tabela de resultados
     testes <- c(t1$method, t2$method, t3$method, t4$method, t5$method,
@@ -1796,8 +1817,9 @@ server <- function(input, output) {
     {output$DAvariableboxplot<-renderPlotly({plot<-ggplot(data(), aes(y=data()[[input$DAvariableselect]], x = as.character(input$DAvariableselect)))+
       geom_boxplot()+
       xlab(input$DAvariableselect)+
-      ylab("")
-    ggplotly(plot)})
+      ylab("") +
+      stat_summary(fun = mean, geom = "point")
+    ggplotly(plot, tooltip = "")})
     
     
     output$DAhistogramplot<-renderPlotly({plot<-ggplot(data(), aes(x=data()[[input$DAvariableselect]], y=..density..))+
@@ -1825,8 +1847,9 @@ server <- function(input, output) {
     plot<-ggplot(data(), aes(y=data()[[input$DAvariableselect]], x = Class, col = Class))+
       geom_boxplot()+
       xlab(input$DAvariableselect)+
-      ylab("")
-    ggplotly(plot)}
+      ylab("")+
+      stat_summary(fun = mean, geom = "point")
+    ggplotly(plot, tooltip = "")}
     )
     
     output$DAhistogramplot<-renderPlotly({Class<-as.character(sampleclass())
@@ -2179,11 +2202,13 @@ server <- function(input, output) {
     
     showModal(modalDialog(title = "Please wait:", "The calculations are running and may take a several minutes. This window will be automatically closed when they are finished.", easyClose = F, footer = ""))
     
-    tpretreatdata<-data.frame(t(pretreatdata()))
-    tdata<-data.frame(t(data()))
-    pretreatvariables<-pretreatvariables()
+    tpretreatdata<-(t(pretreatdata()))
+    tdata<-(t(data()))
+    
     id<-id()
     variables<-variables()
+    pretreatvariables<-pretreatvariables()
+    
     
     output$originaldataplotINT<-renderPlotly({
       t <- list(
@@ -2192,8 +2217,8 @@ server <- function(input, output) {
         color = toRGB("grey50"))
       
       Plot <-  plot_ly(type="scatter",
-                       data=tdata,
-                       x=data.frame(t(variables), check.names = F),
+                       #data=tdata,
+                       x=as.double(data.matrix(data.frame(t(variables), check.names = F))),
                        y=tdata[,1],
                        mode="lines",
                        #options=c(),
@@ -2201,9 +2226,9 @@ server <- function(input, output) {
                        #text=data2,
                        text="",
                        name = data.frame(t(id))[,1],
+                       line = list(width = 0.8),
                        #color = colnames(loadings)[[1]],
                        hoverinfo="skip")%>%
-        add_text(textposition="topright", textfont=t)%>%
         layout(title="<b>Original Spectra</b>",
                xaxis=list(title=paste0(""),zerolinecolor="lightgrey"),
                yaxis=list(title=paste0(""),zerolinecolor="lightgrey"))
@@ -2237,8 +2262,8 @@ server <- function(input, output) {
         color = toRGB("grey50"))
       
      Plot <-  plot_ly(type="scatter",
-                       data=tpretreatdata,
-                       x=data.frame(t(pretreatvariables), check.names = F),
+                       #data=tpretreatdata,
+                       x=as.double(data.matrix(data.frame(t(pretreatvariables), check.names = F))),
                        y=tpretreatdata[,1],
                        mode="lines",
                        #options=c(),
@@ -2246,9 +2271,9 @@ server <- function(input, output) {
                        #text=data2,
                        text="",
                        name = data.frame(t(id))[,1],
+                       line = list(width = 0.8),
                        #color = colnames(loadings)[[1]],
                        hoverinfo="skip")%>%
-        add_text(textposition="topright", textfont=t)%>%
         layout(title="<b>Changed Spectra</b>",
                xaxis=list(title=paste0(""),zerolinecolor="lightgrey"),
                yaxis=list(title=paste0(""),zerolinecolor="lightgrey"))
@@ -2284,7 +2309,51 @@ server <- function(input, output) {
   
   
   
-  output$currentspectraprepro<-renderPlot(matplot(y=t(pretreatdata()), x=pretreatvariables(), type = "l", ylab = "", xlab = "", lty = 1, col = ))
+  #output$currentspectraprepro<-renderPlot(matplot(y=t(pretreatdata()), x=pretreatvariables(), type = "l", ylab = "", xlab = "", lty = 1, col = ))
+  output$currentspectraprepro<-renderPlotly({
+    t <- list(
+      family = "times",
+      size = 12,
+      color = toRGB("grey50"))
+    
+    Plot <-  plot_ly(type="scatter",
+                     #data=tpretreatdata,
+                     x=as.double(as.matrix(data.frame(t(pretreatvariables()), check.names = F))),
+                     y=t(pretreatdata())[,1],
+                     mode="lines",
+                     #options=c(),
+                     showlegend=T,
+                     #text=data2,
+                     text="",
+                     name = data.frame(t(id()))[,1],
+                     line = list(width = 0.8),
+                     #color = colnames(loadings)[[1]],
+                     hoverinfo="skip")%>%
+      layout(title="<b>Changed Spectra</b>",
+             xaxis=list(title=paste0(""),zerolinecolor="lightgrey"),
+             yaxis=list(title=paste0(""),zerolinecolor="lightgrey"))
+    
+    for (i in 2:ncol(t(pretreatdata()))) {
+      
+      Plot<-add_trace(Plot,
+                      y=t(pretreatdata())[,i],
+                      mode="lines",
+                      showlegend=T,
+                      #text=data2,
+                      text="",
+                      name = data.frame(t(id()))[,i],
+                      #color = colnames(loadings)[[i]],
+                      hoverinfo="skip")
+      #add_text(textposition="topright", textfont=t)%>%
+      
+      
+    }
+    
+    
+    Plot
+    
+    
+  })
   output$currentspectrapreprocut<-renderPlot(matplot(y=t(pretreatdata()), x=pretreatvariables(), type = "l", ylab = "", xlab = "", lty = 1, col = )) #com escala
   
   output$currentspectrapreproview<-renderText({xy_range_str <- function(e) {
@@ -2341,14 +2410,16 @@ server <- function(input, output) {
     
     pretreatdata<-pretreatdata()
     
-    if(input$linecolSG=='colSG')
+    if(input$linecolSG=='lineSG')
     {matrix<-savitzkyGolay((pretreatdata), p = input$polyorderSG, w = input$windowsizeSG, m = input$difforderSG)
     pretreatdata((matrix))
+    pretreatvariables(data.frame(as.double(sub(',','.',colnames(pretreatdata())))))
     }
     
-    if(input$linecolSG=='lineSG')
+    if(input$linecolSG=='colSG')
     {matrix<-savitzkyGolay(t(pretreatdata), p = input$polyorderSG, w = input$windowsizeSG, m = input$difforderSG)
     pretreatdata(t(matrix))
+    pretreatvariables(data.frame(as.double(sub(',','.',colnames(pretreatdata())))))
     }
     
   })
@@ -2487,7 +2558,9 @@ server <- function(input, output) {
     
     matrix<-data.matrix(pretreatdata())
     pattern<-as.vector(t(read_excel(input$internalpattern$datapath, col_names = T)))
+    
     matrix2<-matrix/pattern
+    
     colnames(matrix2)<-t(pretreatvariables())
     
     pretreatdata(as.data.frame(matrix2))
@@ -2548,7 +2621,7 @@ server <- function(input, output) {
     pretreatdata2<-ptw$warped.sample
     
     pretreatdata(pretreatdata2)
-    pretreatvariables(colnames(pretreatdata1))
+    pretreatvariables(colnames(pretreatdata2))
     
     removeModal()
     
@@ -2581,7 +2654,7 @@ server <- function(input, output) {
     }
     
     pretreatdata(pretreatdata2)
-    pretreatvariables(colnames(pretreatdata1))
+    #pretreatvariables(colnames(pretreatdata1))
     
     
     output$showwindowsalign<-renderPrint(intervalsvalues)
@@ -2609,7 +2682,7 @@ server <- function(input, output) {
     pretreatdata2[,(intervalsvalues[[1]]):intervalsvalues[[1+1]]]<-ptw$warped.sample
     
     pretreatdata(pretreatdata2)
-    pretreatvariables(colnames(pretreatdata1))
+    #pretreatvariables(colnames(pretreatdata1))
     
     
     output$showwindowsalign<-renderPrint(intervalsvalues)
