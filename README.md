@@ -7,9 +7,6 @@ This repository is the colection of all chemometrics apps developed by our group
 - Licarion Pinto (licarion@gmail.com)
 - Aderval Luna (adsluna@gmail.com)
 
-Please answer the following questionnaire to help us enhance the interface:
-https://docs.google.com/forms/d/1js1Wyf81-8oG6u2w3F9lswMV3MUjX6srkBYWkkOj7Zw/edit?ts=633b6a1f
-
 ## Installation
 
 It is necessary to have the R and RStudio previously installed in your computer.
@@ -50,14 +47,17 @@ It is necessary to have the R and RStudio previously installed in your computer.
 
 ## Data Handling: Chemometrics R-Web App 1 ![image](https://img.shields.io/badge/Version-DH--1.2-blueviolet)
 - This app is currently available for online usage in [this link](https://licarionpinto.shinyapps.io/Data_Handling_app/)
+- Complete change log can be seen on the code
+ - Please answer this [questionnaire](https://docs.google.com/forms/d/1js1Wyf81-8oG6u2w3F9lswMV3MUjX6srkBYWkkOj7Zw/edit?ts=633b6a1f) to help us improve the interface
 - Features:
   - Descriptive analysis:
     - General data information
-    - Per variable Analysis
+    - Per variable Analysis (generaly or by class)
     - Multivariate normality testing
     - Interactive Plots
+      - Can be plotted generaly or by class (if provided)
     - Missing data analysis
-    - Correlation Heatmap (NEW modes adeed)
+    - Correlation Heatmap
 
   - Data Imputation:
     - Simple substituitions (mean, median and 0's)
@@ -76,7 +76,7 @@ It is necessary to have the R and RStudio previously installed in your computer.
 
   - Spectral Visualization
     - Custom spectral image 2D generation (view by class, classes means, select axis names and image definition...)
-    - Spectral Interactive Plot (NEW)
+    - Spectral Interactive Plot
 
   - Variables Preprocessing
     - Simple Operations (mean centering, scaling, autoscaling, logarithmic transformation and frobenius normalization)
