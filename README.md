@@ -8,7 +8,8 @@ This repository is the colection of all chemometrics apps developed by our group
 - Aderval Luna (adsluna@gmail.com)
 
 ## Data Handling: Chemometrics R-Web App 1 ![image](https://img.shields.io/badge/Version-DH--1.2-blueviolet)
-- This app is currently available for online usage in [this link](https://licarionpinto.shinyapps.io/Data_Handling_app/)
+Manuscript link: https://www.sciencedirect.com/science/article/pii/S0169743922002076
+- This app is currently available for online usage in [this link](https://leams-uerj-chemometrics.shinyapps.io/Data_Handling_app/)
 - Complete change log can be seen inside the code
  - Please answer this [questionnaire](https://docs.google.com/forms/d/1js1Wyf81-8oG6u2w3F9lswMV3MUjX6srkBYWkkOj7Zw/edit?ts=633b6a1f) to help us improve the interface
 - Features:
