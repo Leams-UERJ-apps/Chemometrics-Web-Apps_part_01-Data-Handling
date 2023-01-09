@@ -86,3 +86,5 @@ It is necessary to have the R and RStudio previously installed in your computer.
   > - Save with encoding
   > - UTF-8
 
+## Usage
+After the instalation process the app usage consist in simple open the app in Rstudio enviroment and click the Run App button.
