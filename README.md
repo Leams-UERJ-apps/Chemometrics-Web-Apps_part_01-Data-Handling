@@ -53,7 +53,7 @@ Manuscript link: https://www.sciencedirect.com/science/article/pii/S016974392200
 It is necessary to have the R and RStudio previously installed in your computer.
 
 ### Packages and Dependencies Installation
-- Search the GitHub directory for the .R file contaning the packages for the required app (the names of the files for dependencies and the app itself should be similar)
+- Search the GitHub directory for the .R file contaning the packages for the required app (the names of the files for dependencies and the app itself should be similar). For Data_Handling_app this file is called Data_handling_Packages.R
 
    > - Open the file
    > - Righ-Click the "raw" option
