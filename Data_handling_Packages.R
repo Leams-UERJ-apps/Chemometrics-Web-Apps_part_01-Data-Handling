@@ -32,8 +32,11 @@ install.packages("mvnormtest")
 install.packages("corrplot")
 install.packages("GGally")
 
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("BiocGenerics")
+
 
 if (!require("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
-
 BiocManager::install("pcaMethods")
